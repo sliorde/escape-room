@@ -8,7 +8,7 @@ from animator import Animator
 
 with_animation = True
 view_interval = 2500
-view_duration = 100
+view_duration = 50
 
 room = Room(width=14,height=22,door_width=6)
 room.populate_with_robots(num_robots=1)

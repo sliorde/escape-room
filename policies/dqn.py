@@ -8,7 +8,7 @@ from torch import nn
 import torch.nn.functional as F
 
 from policies import Policy
-from utils import decode_action
+from utils import decode_action,encode_action
 
 Transition = namedtuple('Transition',
                         ('state', 'action', 'next_state', 'reward'))
@@ -78,6 +78,10 @@ class DQNPolicy(nn.Module,Policy):
 
         self.optimizer = torch.optim.Adam(self.policy_net.parameters(),lr)
 
+        self.prev_state = {}
+        self.prev_action = {}
+        self.prev_reward = {}
+
     def choose_action_inference(self,state):
         # device = self.get_device()
         # state = torch.from_numpy(state).to(device).flatten()
@@ -96,6 +100,16 @@ class DQNPolicy(nn.Module,Policy):
         else:
             self.steps_done += 1
             return decode_action(random.randint(0,self.num_actions-1))
+
+    def add_to_replay_buffer(self,state,action,reward,robot,):
+        if state is not None:
+            state = torch.tensor(state).flatten()
+        prev_state = self.prev_state.get(robot,None)
+        if prev_state is not None:
+            self.replay_buffer.push(prev_state,self.prev_action[robot],state,self.prev_reward[robot])
+        self.prev_state[robot] = state
+        self.prev_action[robot] = torch.tensor(encode_action(*action))
+        self.prev_reward[robot] = reward
 
     def optimization_step(self):
         if (self.steps_done > 0) and (self.steps_done % self.optimization_interval == 0):
@@ -132,3 +146,4 @@ class DQNPolicy(nn.Module,Policy):
 
     def get_device(self):
         return next(self.policy_net.parameters()).device
+

@@ -24,9 +24,6 @@ class Room:
 
         self.set_room_positions()
 
-        self.prev_states = []
-        self.prev_actions = []
-
     def set_room_positions(self):
         self.bottom_left = np.array([0.0,0.0])
         self.bottom_right = np.array([self.width, 0.0])
@@ -40,8 +37,6 @@ class Room:
             robot = Robot('robot_{:d}'.format(i))
             self.put_robot_somewhere(robot)
             self.robots.append(robot)
-            self.prev_states.append(None)
-            self.prev_actions.append(None)
         self.inverse_robot_mapping = {r:i for (i,r) in enumerate(self.robots)}
 
     def put_robot_somewhere(self,robot):
@@ -123,15 +118,16 @@ class Room:
         for i in inds:
             robot = self.robots[i]
             speed_action,turn_action,state = robot.observe_and_perform_action(self,inference)
-            if self.prev_states[i] is not None:
-                robot.policy.replay_buffer.push(torch.tensor(self.prev_states[i]).flatten(), torch.tensor(encode_action(*self.prev_actions[i])), torch.tensor(state).flatten(), torch.tensor(0.0))
-            self.prev_states[i] = state.copy()
-            self.prev_actions[i] = (speed_action,turn_action)
-            if self.escaped(*robot.location,robot.radius):
+            escaped = self.escaped(*robot.location, robot.radius)
+            if escaped:
+                reward = 1.0
                 escaped_robots.append(robot)
-                robot.policy.replay_buffer.push(torch.tensor(state).flatten(),torch.tensor(encode_action(speed_action,turn_action)),None,torch.tensor(1.0))
-                self.prev_states[i] = None
-            robot.policy.optimization_step()
+            else:
+                reward = 0.0
+            action = (speed_action,turn_action)
+            robot.policy.add_to_replay_buffer(state,action,reward,robot)
+            if escaped:
+                robot.policy.add_to_replay_buffer(state=None, action=action, reward=None, robot=robot)
         for robot in escaped_robots:
             self.put_robot_somewhere(robot)
 
