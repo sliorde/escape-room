@@ -11,4 +11,4 @@ class FixedAffine(torch.nn.Module):
         return x*self.factor+self.offset
 
     def __repr__(self):
-        self._get
+        return 'FixedAffine(factor={:f},offset={:f})'.format(self.factor,self.offset)
