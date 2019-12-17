@@ -11,8 +11,8 @@ class StupidPolicy(Policy):
         self.p_turn = p_turn if p_turn is not None else [0.3,0.5,0.2]
 
     def choose_action_inference(self,state):
-        speed_action = np.random.choice([0,1,2],p=self.p_speed)
-        turn_action = np.random.choice([0,1,2],p=self.p_turn)
+        speed_action = int(np.random.choice([0,1,2],p=self.p_speed))
+        turn_action = int(np.random.choice([0,1,2],p=self.p_turn))
         return speed_action, turn_action
 
     def choose_action_training(self,state):

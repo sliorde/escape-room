@@ -1,6 +1,8 @@
+from typing import Optional
+
 import numpy as np
 
-from utils import my_arctan2, fix_angle
+from utils import my_arctan2, fix_angle, encode_action
 
 
 class Robot:
@@ -23,7 +25,7 @@ class Robot:
         self.direction = None
         self.speed = None
 
-        self.policy = None
+        self.policy:Optional['Policy'] = None
 
         self.steps_in_episode = self.update_steps_in_episode(reset=True)
 
@@ -33,7 +35,12 @@ class Robot:
 
         self.state = np.full((self.num_fov_pixels, 2, 1 + 3),
                              np.nan,
-                             np.single)  # 2, because we take two last frames. 1 is the distance to nearest object. 3 is number of object types (wall,robot,door)  Robo
+                             np.float32)  # 2, because we take two last frames. 1 is the distance to nearest object. 3 is number of object types (wall,robot,door)  Robo
+
+        self.prev_state = self.state.copy()
+        self.prev_action = None
+        self.prev_reward = None
+        self.prev_is_final_state = None
 
     def update_location(self, location, direction, speed):
         self.location = location
@@ -108,6 +115,16 @@ class Robot:
 
         return state
 
+    def give_reward(self, reward=None, is_final_state=None):
+        if reward is not None:
+            self.prev_reward = reward
+        if is_final_state is not None:
+            self.prev_is_final_state = is_final_state
+
+    def update_prev_state_action(self,state,action):
+        self.prev_action = action
+        self.prev_state[:] = state
+
     def update_state_with_wall_or_door(self, state, edge1, edge2, dist, angs, angle_bin_edges, is_door=False):
         if edge1 <= edge2:
             inds = (angle_bin_edges[1:] >= edge1) & (angle_bin_edges[:-1] <= edge2)
@@ -148,16 +165,16 @@ class Robot:
         if collision:
             next_speed = 0
             next_location = self.location
+            self.give_reward(reward=-0.02)
             # next_direction = self.direction+180
         self.update_location(next_location, next_direction, next_speed)
 
-    def observe_and_perform_action(self, room: 'Room', inference=False):
-        state = self.get_observed_state(room)
-        speed_action, turn_action = self.choose_action(state, inference)
+    def choose_and_perform_action(self, room: 'Room', inference=False):
+        speed_action, turn_action = self.choose_action(self.state, inference)
         self.apply_action(speed_action, turn_action, room)
         self.update_steps_in_episode()
+        return encode_action(speed_action, turn_action)
 
-        return speed_action, turn_action, state
 
     def assign_policy(self, policy):
         self.policy = policy

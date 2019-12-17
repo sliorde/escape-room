@@ -1,9 +1,8 @@
-from utils import ReplayMemory
-
+from utils import PrioritizedReplayBuffer
 
 class Policy:
 
-    def __init__(self, replay_buffer_to: ReplayMemory = None, replay_buffer_from: ReplayMemory = None):
+    def __init__(self, replay_buffer_to: PrioritizedReplayBuffer = None, replay_buffer_from: PrioritizedReplayBuffer = None):
         self.replay_buffer_to = replay_buffer_to
         if replay_buffer_from is None:
             self.replay_buffer_from = replay_buffer_to
@@ -22,9 +21,9 @@ class Policy:
         else:
             return self.choose_action_training(state)
 
-    def add_to_replay_buffer(self, state, action, reward, robot):
+    def add_to_replay_buffer(self, prev_state, action, reward, state, is_final_state=False):
         if self.replay_buffer_to is not None:
-            self.replay_buffer_to.add_to_replay_buffer(state, action, reward, robot)
+            self.replay_buffer_to.add(prev_state, action, reward, state, float(is_final_state))
 
     def optimization_step(self):
         pass

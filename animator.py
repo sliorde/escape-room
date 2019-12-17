@@ -1,8 +1,10 @@
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 
 from environment import Room
 
+mpl.rcParams['toolbar'] = 'None'
 
 class Animator:
     """
@@ -11,23 +13,25 @@ class Animator:
 
     def __init__(self, room: Room, robots_to_debug=None):
         self.robots_to_debug = robots_to_debug if robots_to_debug is not None else []
-        self.fig = plt.figure()
+        self.fig = plt.figure(figsize=(2,2*room.height/room.width))
         self.ax1 = plt.axes()
-        plt.plot([0, room.width], [0, 0], color='black')
-        plt.plot([room.width, room.width], [0, room.height], color='black')
-        plt.plot([0, 0], [0, room.height], color='black')
-        plt.plot([0, room.width / 2 - room.door_width / 2], [room.height, room.height], color='black')
-        plt.plot([room.width, room.width / 2 + room.door_width / 2], [room.height, room.height], color='black')
-        self.circles = [plt.Circle((0, 0), robot.radius, color='green' if robot in self.robots_to_debug else 'blue') for
+        self.ax1.plot([0, room.width], [0, 0], color='black')
+        self.ax1.plot([room.width, room.width], [0, room.height], color='black')
+        self.ax1.plot([0, 0], [0, room.height], color='black')
+        self.ax1.plot([0, room.width / 2 - room.door_width / 2], [room.height, room.height], color='black')
+        self.ax1.plot([room.width, room.width / 2 + room.door_width / 2], [room.height, room.height], color='black')
+        self.circles = [plt.Circle((0, 0), robot.radius, color='green' if robot in self.robots_to_debug else 'blue',axes=self.ax1) for
                         robot in room.robots]
-        self.dirs = [plt.plot([0, 0], [0, 0], color='yellow', linewidth=2)[0] for _ in room.robots]
-        self.views = [[plt.plot([0, 0], [0, 0], color='silver', linestyle='-', linewidth=0.4)[0] for _ in
+        self.dirs = [self.ax1.plot([0, 0], [0, 0], color='yellow', linewidth=2)[0] for _ in room.robots]
+        self.views = [[self.ax1.plot([0, 0], [0, 0], color='silver', linestyle='-', linewidth=0.4)[0] for _ in
                        range(robot.num_fov_pixels)] for robot in room.robots if robot in self.robots_to_debug]
         for art in self.circles:
             self.ax1.add_artist(art)
-        plt.axis('equal')
-        plt.axis((-0.5, room.width + 0.5, -0.5, room.height + 0.5))
-
+        self.ax1.axis('equal')
+        self.ax1.axis((-0.1, room.width + 0.1, -0.1, room.height + 0.1))
+        self.ax1.set_frame_on(False)
+        self.ax1.set_title(' ')
+        self.fig.tight_layout()
         self.room = room
 
     def Update(self):
