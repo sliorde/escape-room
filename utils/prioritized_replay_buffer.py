@@ -140,7 +140,7 @@ class MinSegmentTree(SegmentTree):
 
 
 class ReplayBuffer(object):
-    def __init__(self, size):
+    def __init__(self, name, size):
         """Create Replay buffer.
 
         Parameters
@@ -149,6 +149,7 @@ class ReplayBuffer(object):
             Max number of transitions to store in the buffer. When the buffer
             overflows the old memories are dropped.
         """
+        self.name = name
         self._storage = []
         self._maxsize = size
         self._next_idx = 0
@@ -208,7 +209,7 @@ class ReplayBuffer(object):
 
 
 class PrioritizedReplayBuffer(ReplayBuffer):
-    def __init__(self, size, alpha):
+    def __init__(self, name, size, alpha):
         """Create Prioritized Replay buffer.
 
         Parameters
@@ -224,7 +225,7 @@ class PrioritizedReplayBuffer(ReplayBuffer):
         --------
         ReplayBuffer.__init__
         """
-        super(PrioritizedReplayBuffer, self).__init__(size)
+        super(PrioritizedReplayBuffer, self).__init__(name,size)
         assert alpha >= 0
         self._alpha = alpha
 

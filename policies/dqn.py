@@ -1,7 +1,8 @@
 import random
 import math
 import pickle
-import os
+from os import path
+import zlib
 
 import numpy as np
 import torch
@@ -11,7 +12,7 @@ from torch import nn
 from policies import Policy
 from utils import decode_action, FixedAffine
 
-class DQN(nn.Module):
+class QNetwork(nn.Module):
 
     def __init__(self, state_numel, num_actions, widths, use_bn):
         nn.Module.__init__(self)
@@ -39,8 +40,8 @@ class DQNPolicy(nn.Module, Policy):
         nn.Module.__init__(self)
         Policy.__init__(self, replay_buffer_to, replay_buffer_from)
 
-        self.policy_net = DQN(np.prod(state_shape), num_actions, widths, use_bn)
-        self.target_net = DQN(np.prod(state_shape), num_actions, widths, use_bn)
+        self.policy_net = QNetwork(np.prod(state_shape), num_actions, widths, use_bn)
+        self.target_net = QNetwork(np.prod(state_shape), num_actions, widths, use_bn)
         self.target_net.load_state_dict(self.policy_net.state_dict())
         self.policy_net.eval()
         self.target_net.eval()
@@ -88,8 +89,8 @@ class DQNPolicy(nn.Module, Policy):
             self.env_steps_done += 1
             return decode_action(int(random.randint(0, self.num_actions - 1)))
 
-    def save_checkpoint(self):
-        to_save = {
+    def save_checkpoint(self,output_dir):
+        cp_to_save = {
             'policy_net':self.policy_net.state_dict(),
             'target_net':self.target_net.state_dict(),
             'optimizer':self.optimizer.state_dict(),
@@ -107,14 +108,19 @@ class DQNPolicy(nn.Module, Policy):
             'beta0':self.beta0,
             'beta_iters':self.beta_iters,
             'last_n_steps':self.last_n_steps,
-            'checkpoint_save_interval': self.checkpoint_save_interval,
-            'replay_buffer_to':pickle.dumps(self.replay_buffer_to),
-            'replay_buffer_from': None if self.replay_buffer_from is self.replay_buffer_to else pickle.dumps(self.replay_buffer_from),
+            'checkpoint_save_interval': self.checkpoint_save_interval
         }
-        os.makedirs('checkpoints',exist_ok=True)
-        torch.save(to_save,'checkpoints/checkpoint{:s}.ckpt'.format('_'+self.name if self.name is not None else ''))
+        torch.save(cp_to_save,path.join(output_dir,'checkpoint{:s}_{:d}.ckpt'.format('_'+self.name if self.name is not None else '',self.opt_steps_done)))
 
-    def optimization_step(self):
+        rb_to_save = {
+            'replay_buffer_to': pickle.dumps(self.replay_buffer_to),
+            'replay_buffer_from': None if self.replay_buffer_from is self.replay_buffer_to else pickle.dumps(self.replay_buffer_from)
+        }
+        with open(path.join(output_dir,'replay_buffer_{:s}'.format(self.replay_buffer_to.name)),'wb') as f:
+            f.write(zlib.compress(pickle.dumps(rb_to_save)))
+
+
+    def optimization_step(self,output_dir):
         if (self.env_steps_done >= self.optimization_start) and ((self.env_steps_done-self.optimization_start) % self.optimization_interval == 0):
             device = self.get_device()
             if len(self.replay_buffer_from) < self.batch_size:
@@ -156,7 +162,7 @@ class DQNPolicy(nn.Module, Policy):
             self.opt_steps_done += 1
 
             if (self.checkpoint_save_interval is not None) and (self.opt_steps_done % self.checkpoint_save_interval == 0):
-                self.save_checkpoint()
+                self.save_checkpoint(output_dir)
 
     def get_device(self):
         return next(self.policy_net.parameters()).device

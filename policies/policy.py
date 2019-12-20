@@ -25,5 +25,5 @@ class Policy:
         if self.replay_buffer_to is not None:
             self.replay_buffer_to.add(prev_state, action, reward, state, float(is_final_state))
 
-    def optimization_step(self):
+    def optimization_step(self,output_dir):
         pass

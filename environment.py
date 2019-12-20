@@ -2,14 +2,15 @@ from itertools import cycle
 from typing import List
 import pickle
 import zlib
+from os import path
 
 import numpy as np
 from scipy.spatial.distance import pdist, squareform
 
 from agent import Robot
 from policies import Policy
+from rewards import Rewards
 from utils import my_arctan2
-
 
 class Room:
     def __init__(self, width, height, door_width, max_episode_steps, history_save_interval):
@@ -31,7 +32,7 @@ class Room:
 
         self.set_room_positions()
 
-        self.location_history = np.empty((0,0,2))
+        self.location_history = np.empty((0,0,4))
         self.location_ind = 0
 
 
@@ -49,7 +50,7 @@ class Room:
             self.put_robot_somewhere(robot)
             self.robots.append(robot)
             self.inverse_robot_mapping[robot] = i
-        self.location_history = np.concatenate((self.location_history,np.full((num_robots,self.location_history.shape[1],2),np.nan)),0)
+        self.location_history = np.concatenate((self.location_history,np.full((num_robots,self.location_history.shape[1],4),np.nan)),0)
 
     def put_robot_somewhere(self, robot):
         found = False
@@ -117,7 +118,7 @@ class Room:
             escaped = self.escaped(*robot.location, robot.radius)
             reset = (self.max_episode_steps is not None) and (robot.steps_in_episode > self.max_episode_steps) and not escaped
             if escaped:
-                robot.give_reward(reward=1.0, is_final_state=True)
+                robot.give_reward(reward=Rewards.escape, is_final_state=True)
                 robot.update_steps_in_episode(reset=True)
                 escaped_robots.append(robot)
                 print(robot.name + ' escaped @ {:d}'.format(self.step))
@@ -130,21 +131,23 @@ class Room:
                 robot.give_reward(is_final_state=False)
         return escaped_robots
 
-    def update_location_history(self):
+    def update_location_history(self,output_dir):
         if self.location_ind == self.location_history.shape[1]:
-            self.location_history = np.concatenate((self.location_history,np.full((self.location_history.shape[0],50000,2),np.nan)),1)
-        self.location_history[:,self.location_ind,:] = [robot.location for robot in self.robots]
+            self.location_history = np.concatenate((self.location_history,np.full((self.location_history.shape[0],50000,4),np.nan)),1)
+        self.location_history[:,self.location_ind,:] = [list(robot.location)+[robot.direction, robot.prev_reward] for robot in self.robots]
         self.location_ind += 1
 
-        if (self.history_save_interval is not None) and (self.step % self.history_save_interval):
-            with open('checkpoints/history.pickle','wb') as f:
-                f.write(zlib.compress(pickle.dumps(self.location_history[:,:(self.location_ind-1),:])))
+        if (self.history_save_interval is not None) and (self.location_ind == self.history_save_interval):
+            with open(path.join(output_dir,'history_{:d}.pickle'.format(self.step+1-self.history_save_interval)),'wb') as f:
+                f.write(zlib.compress(pickle.dumps(self.location_history[:,:self.location_ind,:])))
+                self.location_ind = 0
+                self.location_history = np.empty((self.location_history.shape[0],0,4))
 
-    def global_step(self, inference=False):
+    def global_step(self, output_dir, inference=False):
 
         escaped_robots = self.check_final_state()
 
-        self.update_location_history()
+        self.update_location_history(output_dir)
 
         for robot in np.random.permutation(escaped_robots):
             self.put_robot_somewhere(robot)
@@ -153,11 +156,11 @@ class Room:
             state = robot.get_observed_state(self)
             if robot.prev_action is not None:
                 robot.policy.add_to_replay_buffer(robot.prev_state,robot.prev_action,robot.prev_reward,state,robot.prev_is_final_state)
-            robot.give_reward(reward=0.0, is_final_state=False)
+            robot.give_reward(reward=Rewards.neutral, is_final_state=False)
             action = robot.choose_and_perform_action(self, inference)
             robot.update_prev_state_action(state,action)
 
         for policy in self.policies:
-            policy.optimization_step()
+            policy.optimization_step(output_dir)
 
         self.step += 1

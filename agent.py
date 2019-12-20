@@ -2,6 +2,7 @@ from typing import Optional
 
 import numpy as np
 
+from rewards import Rewards
 from utils import my_arctan2, fix_angle, encode_action
 
 
@@ -165,7 +166,7 @@ class Robot:
         if collision:
             next_speed = 0
             next_location = self.location
-            self.give_reward(reward=-0.02)
+            self.give_reward(reward=Rewards.collision)
             # next_direction = self.direction+180
         self.update_location(next_location, next_direction, next_speed)
 
