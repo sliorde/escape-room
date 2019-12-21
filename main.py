@@ -1,27 +1,28 @@
 from itertools import count
+from math import log
 
 from agent import Robot
 from environment import Room
 from rewards import Rewards
-from policies import HeuristicPolicy, DQNPolicy
-from utils import PrioritizedReplayBuffer
-from utils import get_output_dir, save_to_zip
+from policies import HeuristicPolicy, DQNPolicy, SACPolicy
+from utils import ReplayBuffer
+from utils import get_output_dir, save_to_zip, save_params
 from animator import Animator
 
 output_dir = get_output_dir(__file__)
 save_to_zip(output_dir)
 
-with_animation = False
+with_animation = True
 view_interval = 3000
 view_duration = 150
 
-max_steps = 300000
+max_steps = None
 
 Rewards.escape = 1.0
 Rewards.collision = -0.02
 
-Robot.fov_size = 120
-Robot.num_fov_pixels = 30
+Robot.fov_size = 170
+Robot.num_fov_pixels = 50
 Robot.max_speed = 2
 Robot.num_speeds = 3
 Robot.turn_speed = 10
@@ -35,22 +36,25 @@ room = Room(
 )
 room.populate_with_robots(num_robots=8)
 
-replay_buffer = PrioritizedReplayBuffer(name='rb1',size=100000,alpha=0.8)
+replay_buffer = ReplayBuffer(size=100000)
+
 dqn_policy = DQNPolicy(
     name='dqn1',
     state_shape=(Robot.num_fov_pixels, 2, 4),
     num_actions=3 * 3,
     widths=[128, 64, ],
     use_bn=False,
-    replay_buffer_to=replay_buffer,
-    beta0=0.4,
-    beta_iters=300000, # opt steps
-    last_n_steps=8,
-    eps_start=0.9,
-    eps_end=0.05,
-    eps_decay=300000, # policy steps
+    replay_buffer_base=replay_buffer,
+    replay_buffer_alpha=0.8,
+    replay_buffer_beta0=0.4,
+    replay_buffer_beta_iters=300000, # opt steps
+    initial_max_priority = 0.2,
+    last_n_steps=len(room.robots),
+    explore_eps_start=0.9,
+    explore_eps_end=0.05,
+    explore_eps_decay=300000, # policy steps
     batch_size=32,
-    gamma=0.99,
+    discount_gamma=0.99,
     optimization_interval=1,
     optimization_start=1,
     target_update_interval=1000, # opt steps
@@ -58,12 +62,40 @@ dqn_policy = DQNPolicy(
     optimizer='ADAM',
     checkpoint_save_interval=50000, # opt steps
 )
+# sac_policy = SACPolicy(
+#     name = 'sac1',
+#     state_shape = (Robot.num_fov_pixels, 2, 4),
+#     num_actions = 3*3,
+#     widths = [128, 64, ],
+#     use_bn = False,
+#     replay_buffer_base = replay_buffer,
+#     replay_buffer_alpha=0.8,
+#     replay_buffer_beta0=0.4,
+#     replay_buffer_beta_iters=300000,  # opt steps
+#     initial_max_priority = 0.2,
+#     target_entropy = log(3),
+#     target_ema_rate = 0.005,
+#     batch_size = 32,
+#     discount_gamma = 0.99,
+#     optimization_interval = 1,
+#     optimization_start = 1,
+#     lr = 1e-3,
+#     lr_temperature = 1e-3,
+#     optimizer = 'ADAM',
+#     checkpoint_save_interval = 50000,
+#     last_n_steps=len(room.robots),
+# )
+
+policy = dqn_policy
+
 # heuristic_policy = HeuristicPolicy(replay_buffer)
 
-room.assign_policies([dqn_policy])
+save_params(output_dir, width=room.width, height=room.height, door_width=room.door_width, radius=Robot.radius, gamma=policy.discount_gamma, escape_reward=Rewards.escape)
+
+room.assign_policies([policy])
 
 if with_animation:
-    animator = Animator(room,pause_time=0.0001) # robots_to_debug=[room.robots[0]]
+    animator = Animator(room,pause_time=0.0001)#,robots_to_debug=[room.robots[0]])
     animator.Update()
 
 for step in count():

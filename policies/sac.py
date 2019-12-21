@@ -1,5 +1,3 @@
-import random
-import math
 import pickle
 from os import path
 import zlib
@@ -34,9 +32,27 @@ class QNetwork(nn.Module):
     def forward(self, state):
         return self.layers(state)
 
+    def sample(self, state, temperature):
+        with torch.no_grad():
+            q_values = self(state)
+            probs = torch.softmax(q_values / temperature, -1)
+        probs = probs.cpu().numpy()
+        action = int(np.random.choice(len(probs),p=probs))
+        return action # ,probs[action]
 
-class DQNPolicy(Policy):
-    def __init__(self, state_shape, num_actions, widths, use_bn, replay_buffer_base, replay_buffer_alpha, replay_buffer_beta0, replay_buffer_beta_iters,initial_max_priority,explore_eps_start, explore_eps_end, explore_eps_decay, batch_size, discount_gamma, optimization_interval, optimization_start, target_update_interval, lr, optimizer, checkpoint_save_interval, last_n_steps, name=None):
+    def get_soft_value(self, state, temperature):
+        q_values = self(state)
+        probs = torch.softmax(q_values / temperature, -1)
+        return torch.sum((q_values - temperature * torch.log(probs)) * probs, -1)
+
+    def get_entropy(self, state, temperature):
+        q_values = self(state).detach()
+        probs = torch.softmax(q_values / temperature, -1)
+        return torch.mean(-1*torch.sum((torch.log(probs)) * probs, -1))
+
+class SACPolicy(Policy):
+    def __init__(self, state_shape, num_actions, widths, use_bn, replay_buffer_base, replay_buffer_alpha, replay_buffer_beta0, replay_buffer_beta_iters, initial_max_priority, target_entropy, target_ema_rate, batch_size, discount_gamma, optimization_interval, optimization_start, lr, lr_temperature, optimizer, checkpoint_save_interval, last_n_steps, name=None):
+
         replay_buffer = PrioritizedReplayBuffer(replay_buffer_base,replay_buffer_alpha,initial_max_priority,name)
 
         Policy.__init__(self, replay_buffer)
@@ -49,24 +65,25 @@ class DQNPolicy(Policy):
 
         self.env_steps_done = 0
         self.opt_steps_done = 0
-        self.explore_eps_start = explore_eps_start
-        self.explore_eps_end = explore_eps_end
-        self.explore_eps_decay = explore_eps_decay
+        self.target_entropy = target_entropy
+        self.target_ema_rate = target_ema_rate
 
         self.num_actions = num_actions
         self.batch_size = batch_size
         self.discount_gamma = discount_gamma
         self.optimization_interval = optimization_interval
         self.optimization_start = optimization_start
-        self.target_update_interval = target_update_interval
         self.replay_buffer_beta0 = replay_buffer_beta0
         self.replay_buffer_beta_iters = replay_buffer_beta_iters
         self.last_n_steps = last_n_steps
+
+        self.temperature = torch.tensor(1.0, requires_grad=True)
 
         if optimizer.casefold()=='ADAM'.casefold():
             self.optimizer = torch.optim.Adam(self.policy_net.parameters(), lr)
         else:
             self.optimizer = torch.optim.SGD(self.policy_net.parameters(), lr)
+        self.temperature_optimizer = torch.optim.SGD([self.temperature], lr_temperature)
 
         self.checkpoint_save_interval = checkpoint_save_interval
         self.name = name
@@ -81,31 +98,29 @@ class DQNPolicy(Policy):
             return decode_action(int(a))
 
     def choose_action_training(self, state):
-        sample = random.random()
-        eps_threshold = self.explore_eps_end + (self.explore_eps_start - self.explore_eps_end) * \
-                        math.exp(-1. * self.env_steps_done / self.explore_eps_decay)
-        if sample > eps_threshold:
-            return self.choose_action_inference(state)
-        else:
-            self.env_steps_done += 1
-            return decode_action(int(random.randint(0, self.num_actions - 1)))
+        device = self.get_device()
+        # state = torch.from_numpy(state).to(device).flatten()
+        state = torch.from_numpy(state).to(device)
+        action = self.policy_net.sample(state.flatten(), self.temperature)
+        self.env_steps_done += 1
+        return decode_action(action)
 
     def save_checkpoint(self,output_dir):
         cp_to_save = {
             'policy_net':self.policy_net.state_dict(),
             'target_net':self.target_net.state_dict(),
+            'temperature':self.temperature,
             'optimizer':self.optimizer.state_dict(),
+            'temperature_optimizer':self.temperature_optimizer.state_dict(),
             'env_steps_done':self.env_steps_done,
             'opt_steps_done':self.opt_steps_done,
-            'explore_eps_start':self.explore_eps_start,
-            'explore_eps_end':self.explore_eps_end,
-            'explore_eps_decay':self.explore_eps_decay,
             'num_actions':self.num_actions,
             'batch_size':self.batch_size,
             'gamma':self.discount_gamma,
+            'target_entropy':self.target_entropy,
+            'target_ema_rate':self.target_ema_rate,
             'optimization_interval':self.optimization_interval,
             'optimization_start':self.optimization_start,
-            'target_update_interval':self.target_update_interval,
             'replay_buffer_beta0':self.replay_buffer_beta0,
             'replay_buffer_beta_iters':self.replay_buffer_beta_iters,
             'last_n_steps':self.last_n_steps,
@@ -134,9 +149,9 @@ class DQNPolicy(Policy):
             weights = torch.from_numpy(weights).to(device)
 
             self.policy_net.train()
-            state_action_values = self.policy_net(states.reshape(states.shape[0],-1)).gather(1, actions[:, None]).squeeze(1)
+            state_action_values = self.policy_net(states.reshape(states.shape[0], -1)).gather(1, actions[:, None]).squeeze(1)
             next_state_values = torch.zeros(self.batch_size, device=device)
-            next_state_values[is_non_final_states] = self.target_net(next_states.reshape(next_states.shape[0],-1)[is_non_final_states]).max(1)[0].detach()
+            next_state_values[is_non_final_states] = self.target_net.get_soft_value(next_states.reshape(next_states.shape[0], -1)[is_non_final_states], self.temperature).detach()
             expected_state_action_values = rewards + (next_state_values * self.discount_gamma)
             td_errors = (state_action_values - expected_state_action_values).detach()
 
@@ -152,8 +167,13 @@ class DQNPolicy(Policy):
             self.optimizer.step()
             self.policy_net.eval()
 
-            if (self.opt_steps_done > 0) and (self.opt_steps_done % self.target_update_interval == 0):
-                self.target_net.load_state_dict(self.policy_net.state_dict())
+            temperature_loss = -1 * self.temperature * (self.policy_net.get_entropy(states.reshape(states.shape[0], -1),self.temperature)-self.target_entropy)
+            self.temperature_optimizer.zero_grad()
+            temperature_loss.backward()
+            self.temperature_optimizer.step()
+
+            for w1,w2 in zip(self.target_net.parameters(),self.policy_net.parameters()):
+                w1.data = self.target_ema_rate*w1.data+(1-self.target_ema_rate)*w2.data
 
             new_priorities = np.abs(td_errors.cpu().numpy())+1e-6
             self.replay_buffer.update_priorities(batch_inds,new_priorities)
@@ -162,6 +182,7 @@ class DQNPolicy(Policy):
 
             if (self.checkpoint_save_interval is not None) and (self.opt_steps_done % self.checkpoint_save_interval == 0):
                 self.save_checkpoint(output_dir)
+
 
     def get_device(self):
         return next(self.policy_net.parameters()).device

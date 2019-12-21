@@ -7,16 +7,17 @@ import numpy as np
 
 from animator import Animator
 
-path = '../checkpoints/main/2019-12-20-20-18-58-034503'
-save = False
+path = '../checkpoints/main/2019-12-20-21-33-36-625028'
+start = 168000
+num_steps = 3000
 
-start = 980
-num_steps = 400
-width = 14
-height = 22
-door_width = 6
-radius = 1
-num_fov_pixels = 30
+with open(os.path.join(path,'params.pickle'),'rb') as f:
+    d = pickle.load(f)
+
+height = d['height']
+width = d['width']
+door_width = d['door_width']
+radius = d['radius']
 
 history_files = glob.glob(path+'/history_*.pickle')
 start_steps = [int(os.path.basename(f).lstrip('history_').rstrip('.pickle')) for f in history_files]
@@ -30,7 +31,7 @@ def get_file_ind(step):
 with open(history_files[0], 'rb') as f:
     num_robots = pickle.loads(zlib.decompress(f.read())).shape[0]
 
-animator = Animator(width=width, height=height, door_width=door_width, radi=[radius] * num_robots, num_fov_pixels=[num_fov_pixels] * num_robots, pause_time=0.01)
+animator = Animator(width=width, height=height, door_width=door_width, radi=[radius] * num_robots, pause_time=0.01)
 
 prev_file_ind = None
 history = None

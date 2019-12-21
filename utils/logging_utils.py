@@ -2,6 +2,7 @@ from os import walk, makedirs
 from os.path import dirname, abspath, relpath, join, splitext, basename
 from datetime import datetime
 from zipfile import ZipFile, ZIP_DEFLATED
+import pickle
 
 def save_to_zip(output_dir):
     zipf = ZipFile(join(output_dir,'files.zip'), 'w', ZIP_DEFLATED)
@@ -18,3 +19,7 @@ def get_output_dir(name):
     output_dir = join('checkpoints', name, t)
     makedirs(output_dir,exist_ok=True)
     return output_dir
+
+def save_params(output_dir,**kwargs):
+    with open(join(output_dir,'params.pickle'),'wb') as f:
+        pickle.dump(kwargs,f)

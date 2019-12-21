@@ -5,8 +5,8 @@ from policies import Policy
 from agent import Robot
 
 class StupidPolicy(Policy):
-    def __init__(self, p_speed=None, p_turn=None, replay_buffer_to=None,replay_buffer_from=None):
-        Policy.__init__(self, replay_buffer_to,replay_buffer_from)
+    def __init__(self, p_speed=None, p_turn=None, replay_buffer=None):
+        Policy.__init__(self, replay_buffer)
         self.p_speed = p_speed if p_speed is not None else [0.2,0.0,0.8]
         self.p_turn = p_turn if p_turn is not None else [0.3,0.5,0.2]
 
@@ -19,8 +19,8 @@ class StupidPolicy(Policy):
         return self.choose_action_inference(state)
 
 class HeuristicPolicy(Policy):
-    def __init__(self, replay_buffer_to=None,replay_buffer_from=None):
-        Policy.__init__(self, replay_buffer_to,replay_buffer_from)
+    def __init__(self, replay_buffer=None):
+        Policy.__init__(self, replay_buffer)
 
     def choose_action_inference(self,state):
 

@@ -16,8 +16,8 @@ class Animator:
     use this class for viewing the room and the filters of the Q-network
     """
 
-    def __init__(self, room:Optional[Room]=None, robots_to_debug=None, width=None, height=None,door_width=None,radi=None,num_fov_pixels=None,pause_time=None):
-        args = [width, height, door_width,radi,num_fov_pixels]
+    def __init__(self, room:Optional[Room]=None, robots_to_debug=None, width=None, height=None,door_width=None,radi=None,pause_time=None):
+        args = [width, height, door_width,radi]
         assert (room is not None and all([x is None for x in args]) ) or (room is None and robots_to_debug is None and all(
             [x is not None for x in args]))
 
@@ -28,7 +28,7 @@ class Animator:
             door_width = room.door_width
             robots = room.robots
         else:
-            robots = [FakeRobot(location=None,direction=None,radius=r,num_fov_pixels=n) for r,n in zip(radi,num_fov_pixels)]
+            robots = [FakeRobot(location=None,direction=None,radius=r,num_fov_pixels=None) for r in radi]
 
 
         self.robots_to_debug = robots_to_debug if robots_to_debug is not None else []

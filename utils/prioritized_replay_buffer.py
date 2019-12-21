@@ -86,7 +86,6 @@ class SegmentTree(object):
         assert 0 <= idx < self._capacity
         return self._value[self._capacity + idx]
 
-
 class SumSegmentTree(SegmentTree):
     def __init__(self, capacity):
         super(SumSegmentTree, self).__init__(
@@ -124,7 +123,6 @@ class SumSegmentTree(SegmentTree):
                 idx = 2 * idx + 1
         return idx - self._capacity
 
-
 class MinSegmentTree(SegmentTree):
     def __init__(self, capacity):
         super(MinSegmentTree, self).__init__(
@@ -138,9 +136,8 @@ class MinSegmentTree(SegmentTree):
 
         return super(MinSegmentTree, self).reduce(start, end)
 
-
 class ReplayBuffer(object):
-    def __init__(self, name, size):
+    def __init__(self, size):
         """Create Replay buffer.
 
         Parameters
@@ -149,7 +146,6 @@ class ReplayBuffer(object):
             Max number of transitions to store in the buffer. When the buffer
             overflows the old memories are dropped.
         """
-        self.name = name
         self._storage = []
         self._maxsize = size
         self._next_idx = 0
@@ -208,8 +204,8 @@ class ReplayBuffer(object):
         return self._encode_sample(idxes)
 
 
-class PrioritizedReplayBuffer(ReplayBuffer):
-    def __init__(self, name, size, alpha):
+class PrioritizedReplayBuffer():
+    def __init__(self, base_buffer:ReplayBuffer, alpha, initial_max_priority, name):
         """Create Prioritized Replay buffer.
 
         Parameters
@@ -225,28 +221,34 @@ class PrioritizedReplayBuffer(ReplayBuffer):
         --------
         ReplayBuffer.__init__
         """
-        super(PrioritizedReplayBuffer, self).__init__(name,size)
+        self.name = name
+
+        self.base_buffer = base_buffer
+
         assert alpha >= 0
         self._alpha = alpha
 
         it_capacity = 1
-        while it_capacity < size:
+        while it_capacity < self.base_buffer._maxsize:
             it_capacity *= 2
 
         self._it_sum = SumSegmentTree(it_capacity)
         self._it_min = MinSegmentTree(it_capacity)
-        self._max_priority = 1.0
+        self._max_priority = initial_max_priority
+
+    def __len__(self):
+        return len(self.base_buffer)
 
     def add(self, *args, **kwargs):
         """See ReplayBuffer.store_effect"""
-        idx = self._next_idx
-        super().add(*args, **kwargs)
+        idx = self.base_buffer._next_idx
+        self.base_buffer.add(*args, **kwargs)
         self._it_sum[idx] = self._max_priority ** self._alpha
         self._it_min[idx] = self._max_priority ** self._alpha
 
     def _sample_proportional(self, batch_size):
         res = []
-        p_total = self._it_sum.sum(0, len(self._storage) - 1)
+        p_total = self._it_sum.sum(0, len(self.base_buffer._storage) - 1)
         every_range_len = p_total / batch_size
         for i in range(batch_size):
             mass = random.random() * every_range_len + i * every_range_len
@@ -292,21 +294,21 @@ class PrioritizedReplayBuffer(ReplayBuffer):
         """
         assert beta > 0
 
-        last_n = min(last_n,len(self))
+        last_n = min(last_n,len(self.base_buffer))
 
         idxes = self._sample_proportional(batch_size-last_n)
-        idxes += [(self._next_idx-i-1)%len(self) for i in range(last_n)]
+        idxes += [(self.base_buffer._next_idx-i-1)%len(self.base_buffer) for i in range(last_n)]
 
         weights = []
         p_min = self._it_min.min() / self._it_sum.sum()
-        max_weight = (p_min * len(self._storage)) ** (-beta)
+        max_weight = (p_min * len(self.base_buffer._storage)) ** (-beta)
 
         for idx in idxes:
             p_sample = self._it_sum[idx] / self._it_sum.sum()
-            weight = (p_sample * len(self._storage)) ** (-beta)
+            weight = (p_sample * len(self.base_buffer._storage)) ** (-beta)
             weights.append(weight / max_weight)
         weights = np.array(weights,np.float32)
-        encoded_sample = self._encode_sample(idxes)
+        encoded_sample = self.base_buffer._encode_sample(idxes)
         return tuple(list(encoded_sample) + [weights, idxes])
 
     def update_priorities(self, idxes, priorities):
@@ -327,7 +329,7 @@ class PrioritizedReplayBuffer(ReplayBuffer):
         assert len(idxes) == len(priorities)
         for idx, priority in zip(idxes, priorities):
             assert priority > 0
-            assert 0 <= idx < len(self._storage)
+            assert 0 <= idx < len(self.base_buffer._storage)
             self._it_sum[idx] = priority ** self._alpha
             self._it_min[idx] = priority ** self._alpha
 

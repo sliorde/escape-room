@@ -9,16 +9,18 @@ import numpy as np
 
 from animator import Animator
 
-path = '../checkpoints/main/2019-12-20-21-33-36-625028'
+path = '../checkpoints/main/2019-12-21-00-35-29-211579'
 save = False
+start = 600000
+num_steps = 4000
 
-start = 168000
-num_steps = 3000
-width = 14
-height = 22
-door_width = 6
-radius = 1
-num_fov_pixels = 30
+with open(os.path.join(path,'params.pickle'),'rb') as f:
+    d = pickle.load(f)
+
+height = d['height']
+width = d['width']
+door_width = d['door_width']
+radius = d['radius']
 
 history_files = glob.glob(path+'/history_*.pickle')
 start_steps = [int(os.path.basename(f).lstrip('history_').rstrip('.pickle')) for f in history_files]
@@ -36,7 +38,7 @@ if save:
     import matplotlib
     matplotlib.use('Agg')
 
-animator = Animator(width=width, height=height, door_width=door_width, radi=[radius] * num_robots, num_fov_pixels=[num_fov_pixels] * num_robots, pause_time=None if save else 0.01)
+animator = Animator(width=width, height=height, door_width=door_width, radi=[radius] * num_robots, pause_time=None if save else 0.01)
 
 fig = animator.get_figure()
 

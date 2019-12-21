@@ -6,13 +6,18 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 
-path = '../checkpoints/main/2019-12-20-21-33-36-625028'
+path = '../checkpoints/main/2019-12-21-00-35-29-211579'
+window_size = 1000
 
-height = 22
-radius = 1
-window_size = 500
-gamma = 0.99
-escape_reward = 1.0
+with open(os.path.join(path,'params.pickle'),'rb') as f:
+    d = pickle.load(f)
+
+height = d['height']
+radius = d['radius']
+gamma = d['gamma']
+escape_reward = d['escape_reward']
+
+
 
 history_files = glob.glob(path+'/history_*.pickle')
 start_steps = [int(os.path.basename(f).lstrip('history_').rstrip('.pickle')) for f in history_files]
