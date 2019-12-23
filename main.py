@@ -1,5 +1,5 @@
 from itertools import count
-from math import log
+from math import log,sqrt
 
 from agent import Robot
 from environment import Room
@@ -12,14 +12,14 @@ from animator import Animator
 output_dir = get_output_dir(__file__)
 save_to_zip(output_dir)
 
-with_animation = True
-view_interval = 3000
+with_animation = False
+view_interval = 5000
 view_duration = 150
 
 max_steps = None
 
 Rewards.escape = 1.0
-Rewards.collision = -0.02
+Rewards.collision = -0.007999192985749193
 
 Robot.fov_size = 170
 Robot.num_fov_pixels = 50
@@ -28,13 +28,13 @@ Robot.num_speeds = 3
 Robot.turn_speed = 10
 
 room = Room(
-    width=14,
-    height=22,
-    door_width=6,
+    width=30,
+    height=60,
+    door_width=3.5,
     max_episode_steps=None,
     history_save_interval=50000 # room steps
 )
-room.populate_with_robots(num_robots=8)
+room.populate_with_robots(num_robots=30)
 
 replay_buffer = ReplayBuffer(size=100000)
 
@@ -42,23 +42,25 @@ dqn_policy = DQNPolicy(
     name='dqn1',
     state_shape=(Robot.num_fov_pixels, 2, 4),
     num_actions=3 * 3,
-    widths=[128, 64, ],
+    widths=[256, 128, ],
     use_bn=False,
+    affine_factor = 2/sqrt(room.width**2+room.height**2),
+    affine_offset = -1,
     replay_buffer_base=replay_buffer,
-    replay_buffer_alpha=0.8,
-    replay_buffer_beta0=0.4,
-    replay_buffer_beta_iters=300000, # opt steps
+    replay_buffer_alpha=0.7222068575401144,
+    replay_buffer_beta0=0.6083732563905723,
+    replay_buffer_beta_iters=200000, # opt steps
     initial_max_priority = 0.2,
     last_n_steps=len(room.robots),
     explore_eps_start=0.9,
     explore_eps_end=0.05,
-    explore_eps_decay=300000, # policy steps
-    batch_size=32,
+    explore_eps_decay=400000, # policy steps
+    batch_size=64,
     discount_gamma=0.99,
     optimization_interval=1,
     optimization_start=1,
     target_update_interval=1000, # opt steps
-    lr=1e-3,
+    lr=1e-4,
     optimizer='ADAM',
     checkpoint_save_interval=50000, # opt steps
 )
@@ -68,6 +70,8 @@ dqn_policy = DQNPolicy(
 #     num_actions = 3*3,
 #     widths = [128, 64, ],
 #     use_bn = False,
+#     affine_factor = 2 / sqrt(room.width ** 2 + room.height ** 2),
+#     affine_offset = -1,
 #     replay_buffer_base = replay_buffer,
 #     replay_buffer_alpha=0.8,
 #     replay_buffer_beta0=0.4,

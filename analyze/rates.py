@@ -6,11 +6,12 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 
-path = '../checkpoints/main/2019-12-21-00-35-29-211579'
+path = '../checkpoints/main_random_hparams/2019-12-23-21-17-57-429959/'
 window_size = 1000
 
 with open(os.path.join(path,'params.pickle'),'rb') as f:
     d = pickle.load(f)
+print(d)
 
 height = d['height']
 radius = d['radius']

@@ -9,10 +9,10 @@ import numpy as np
 
 from animator import Animator
 
-path = '../checkpoints/main/2019-12-21-00-35-29-211579'
+path = '../checkpoints/main_random_hparams/2019-12-23-21-17-57-429959'
 save = False
-start = 600000
-num_steps = 4000
+start = 34000
+num_steps = 1000
 
 with open(os.path.join(path,'params.pickle'),'rb') as f:
     d = pickle.load(f)

@@ -14,11 +14,11 @@ from utils import decode_action, FixedAffine, PrioritizedReplayBuffer
 
 class QNetwork(nn.Module):
 
-    def __init__(self, state_numel, num_actions, widths, use_bn):
+    def __init__(self, state_numel, num_actions, widths, use_bn, affine_factor,affine_offset):
         nn.Module.__init__(self)
         widths = [state_numel] + widths + [num_actions]
         layers = []
-        layers.append(FixedAffine(0.1,-1))
+        layers.append(FixedAffine(affine_factor,affine_offset))
         # if use_bn:
         #     layers.append(nn.BatchNorm1d(state_numel))
         for i, (w1, w2) in enumerate(zip(widths[:(-1)], widths[1:])):
@@ -36,13 +36,15 @@ class QNetwork(nn.Module):
 
 
 class DQNPolicy(Policy):
-    def __init__(self, state_shape, num_actions, widths, use_bn, replay_buffer_base, replay_buffer_alpha, replay_buffer_beta0, replay_buffer_beta_iters,initial_max_priority,explore_eps_start, explore_eps_end, explore_eps_decay, batch_size, discount_gamma, optimization_interval, optimization_start, target_update_interval, lr, optimizer, checkpoint_save_interval, last_n_steps, name=None):
+    def __init__(self, state_shape, num_actions, widths, use_bn, affine_factor,affine_offset, replay_buffer_base, replay_buffer_alpha, replay_buffer_beta0, replay_buffer_beta_iters,initial_max_priority,explore_eps_start, explore_eps_end, explore_eps_decay, batch_size, discount_gamma, optimization_interval, optimization_start, target_update_interval, lr, optimizer, checkpoint_save_interval, last_n_steps, name=None):
         replay_buffer = PrioritizedReplayBuffer(replay_buffer_base,replay_buffer_alpha,initial_max_priority,name)
 
         Policy.__init__(self, replay_buffer)
 
-        self.policy_net = QNetwork(np.prod(state_shape), num_actions, widths, use_bn)
-        self.target_net = QNetwork(np.prod(state_shape), num_actions, widths, use_bn)
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+        self.policy_net = QNetwork(np.prod(state_shape), num_actions, widths, use_bn,affine_factor,affine_offset).to(device)
+        self.target_net = QNetwork(np.prod(state_shape), num_actions, widths, use_bn,affine_factor,affine_offset).to(device)
         self.target_net.load_state_dict(self.policy_net.state_dict())
         self.policy_net.eval()
         self.target_net.eval()
@@ -125,12 +127,12 @@ class DQNPolicy(Policy):
             if len(self.replay_buffer) < self.batch_size:
                 return
             beta = np.clip(self.replay_buffer_beta0 + (1.0 - self.replay_buffer_beta0) * (self.opt_steps_done / self.replay_buffer_beta_iters), self.replay_buffer_beta0, 1.0)
-            states, actions, rewards, next_states, is_final_states, weights, batch_inds  = self.replay_buffer.sample(self.batch_size,beta,self.last_n_steps)
+            states, actions, rewards, next_states, is_final_states, weights, batch_inds  = self.replay_buffer.sample(self.batch_size, beta, self.last_n_steps)
             states = torch.from_numpy(states).to(device)
             actions = torch.from_numpy(actions).to(device)
             rewards = torch.from_numpy(rewards).to(device)
             next_states = torch.from_numpy(next_states).to(device)
-            is_non_final_states = ~torch.from_numpy(is_final_states).to(device)
+            is_non_final_states = ~torch.from_numpy(is_final_states).bool().to(device)
             weights = torch.from_numpy(weights).to(device)
 
             self.policy_net.train()
