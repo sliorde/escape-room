@@ -12,8 +12,11 @@ window_size = 1000
 fig, ax = plt.subplots(1)
 ax.set_prop_cycle(cycler(linestyle=['-','--',':','-.'])*cycler(color=plt.get_cmap('tab20').colors))
 
+ax.set_title('')
+
 did_title = False
 search_path = '../checkpoints/main_random_hparams/hparams1'
+lines = []
 for path in glob.glob(os.path.join(search_path ,'*')):
 
     try:
@@ -44,11 +47,21 @@ for path in glob.glob(os.path.join(search_path ,'*')):
     escapes_per_time = np.concatenate(escapes_per_time,0)
     escapes_per_window = np.convolve(escapes_per_time,np.ones(window_size),'same')
 
-    plt.plot(escapes_per_window,label=path.lstrip(search_path))
+    line, = plt.plot(escapes_per_window,label=path.lstrip(search_path))
+    lines.append(line)
 
     if not did_title:
         print(('{:<28s} {:<7s} '.format('dir','best') + '{:<22s} '*len(d)).format(*d.keys()))
         did_title = True
     print(('{:<28s} {:<7.1f} '.format(path.lstrip(search_path),np.max(escapes_per_window)) + '{:<22} ' * len(d)).format(*d.values()))
-plt.legend()
+
+def onhover(event):
+    ax.set_title('')
+    for line in lines:
+        if line.contains(event)[0]:
+            ax.set_title(line.get_label())
+            break
+    plt.draw()
+fig.canvas.mpl_connect("motion_notify_event", onhover)
+
 plt.show()

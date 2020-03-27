@@ -74,11 +74,15 @@ for j,ee in enumerate(episode_end):
 plt.figure()
 # plt.plot(episode_end, total_returns)
 plt.plot(episode_end, returns_in_window)
+plt.title('returns_in_window')
 
 plt.figure()
 # plt.plot(episode_end, total_returns)
 plt.plot(episode_end, durations_in_window)
+plt.title('durations_in_window')
 
 plt.figure()
 plt.plot(escapes_per_window)
+plt.title('escapes_per_window')
+
 plt.show()
