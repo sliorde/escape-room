@@ -1,5 +1,6 @@
 from itertools import count
 from math import log,exp,sqrt
+import traceback
 
 from agent import Robot
 from environment import Room
@@ -24,6 +25,7 @@ hparams = HParams()
 while True:
 
     output_dir = get_output_dir(__file__)
+    print(output_dir)
     save_to_zip(output_dir)
 
     Rewards.escape = 1.0
@@ -90,7 +92,7 @@ while True:
         batch_size=hparams.register('batch_size',choice([32,64])),
         discount_gamma=hparams.register('discount_gamma',choice([0.91,0.94,0.97,0.99])),
         optimization_interval=1,
-        optimization_start=1,
+        optimization_start=500,
         lr=hparams.register('lr',choice([1e-4,3e-4,1e-3,3e-3,1e-2,3e-2])),
         lr_temperature=hparams.register('lr_temperature',choice([1e-4,3e-4,1e-3,3e-3,1e-2,3e-2])),
         optimizer='ADAM',

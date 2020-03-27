@@ -7,14 +7,14 @@ from cycler import cycler
 import numpy as np
 import matplotlib.pyplot as plt
 
-window_size = 3000
+window_size = 1000
 
 fig, ax = plt.subplots(1)
 ax.set_prop_cycle(cycler(linestyle=['-','--',':','-.'])*cycler(color=plt.get_cmap('tab20').colors))
 
 did_title = False
-
-for path in glob.glob('../checkpoints/main_random_hparams/*'):
+search_path = '../checkpoints/main_random_hparams/hparams1'
+for path in glob.glob(os.path.join(search_path ,'*')):
 
     try:
         with open(os.path.join(path,'params.pickle'),'rb') as f:
@@ -44,11 +44,11 @@ for path in glob.glob('../checkpoints/main_random_hparams/*'):
     escapes_per_time = np.concatenate(escapes_per_time,0)
     escapes_per_window = np.convolve(escapes_per_time,np.ones(window_size),'same')
 
-    plt.plot(escapes_per_window,label=path.lstrip('../checkpoints/main_random_hparams/'))
+    plt.plot(escapes_per_window,label=path.lstrip(search_path))
 
     if not did_title:
-        print(('{:<7s} '.format('best') + '{:<22s} '*len(d)).format(*d.keys()))
+        print(('{:<28s} {:<7s} '.format('dir','best') + '{:<22s} '*len(d)).format(*d.keys()))
         did_title = True
-    print(('{:<7.1f} '.format(np.max(escapes_per_window)) + '{:<22} ' * len(d)).format(*d.values()))
+    print(('{:<28s} {:<7.1f} '.format(path.lstrip(search_path),np.max(escapes_per_window)) + '{:<22} ' * len(d)).format(*d.values()))
 plt.legend()
 plt.show()

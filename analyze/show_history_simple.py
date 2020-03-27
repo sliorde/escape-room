@@ -7,7 +7,7 @@ import numpy as np
 
 from animator import Animator
 
-path = '../checkpoints/main/2019-12-20-21-33-36-625028'
+path = '../checkpoints/main/2019-12-20-21-33-36-625028_before_hparam_search'
 start = 168000
 num_steps = 3000
 

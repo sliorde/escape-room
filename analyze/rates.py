@@ -6,7 +6,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 
-path = '../checkpoints/main_random_hparams/2019-12-23-21-17-57-429959/'
+path = '../checkpoints/main/2019-12-25-07-35-55-054944/'
 window_size = 1000
 
 with open(os.path.join(path,'params.pickle'),'rb') as f:

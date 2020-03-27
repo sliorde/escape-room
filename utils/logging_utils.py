@@ -3,6 +3,7 @@ from os.path import dirname, abspath, relpath, join, splitext, basename
 from datetime import datetime
 from zipfile import ZipFile, ZIP_DEFLATED
 import pickle
+from pytz import timezone
 
 def save_to_zip(output_dir):
     zipf = ZipFile(join(output_dir,'files.zip'), 'w', ZIP_DEFLATED)
@@ -15,7 +16,7 @@ def save_to_zip(output_dir):
 
 def get_output_dir(name):
     name = splitext(basename(name))[0]
-    t = datetime.now().strftime('%Y-%m-%d-%H-%M-%S-%f')
+    t = datetime.now(timezone('Israel')).strftime('%Y-%m-%d-%H-%M-%S-%f')
     output_dir = join('checkpoints', name, t)
     makedirs(output_dir,exist_ok=True)
     return output_dir

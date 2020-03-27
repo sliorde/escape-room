@@ -9,9 +9,9 @@ import numpy as np
 
 from animator import Animator
 
-path = '../checkpoints/main_random_hparams/2019-12-23-21-17-57-429959'
+path = '../checkpoints/main_random_hparams/back_to_original_room_door_and_robots_and_changed_to_sac/2019-12-25-01-56-59-999540'
 save = False
-start = 34000
+start = 38000
 num_steps = 1000
 
 with open(os.path.join(path,'params.pickle'),'rb') as f:
